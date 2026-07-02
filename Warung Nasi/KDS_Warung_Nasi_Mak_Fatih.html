@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KDS - Warung Nasi Mak Fatih</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#1C130B;
+    --tiket:#2A1D12;
+    --tiket-border:#4A3520;
+    --krem:#F3E7D2;
+    --krem-redup:#B7A78C;
+    --emas:#C8992E;
+    --merah:#B5432E;
+    --hijau:#4F7A48;
+    --hijau-redup:rgba(79,122,72,0.18);
+    --merah-redup:rgba(181,67,46,0.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    background-image: radial-gradient(circle at 20% 0%, rgba(200,153,46,0.07), transparent 45%);
+    color:var(--krem);
+    font-family:'JetBrains Mono', monospace;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  header{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    padding:22px 28px;
+    border-bottom:2px solid var(--tiket-border);
+    position:sticky;
+    top:0;
+    background:var(--bg);
+    z-index:10;
+  }
+  header h1{
+    font-family:'Fraunces', serif;
+    font-weight:900;
+    font-size:1.4rem;
+    letter-spacing:0.02em;
+  }
+  header .live-dot{
+    display:inline-block;
+    width:8px;height:8px;
+    border-radius:50%;
+    background:var(--hijau);
+    margin-right:8px;
+    box-shadow:0 0 0 0 rgba(79,122,72,0.6);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(79,122,72,0.5);}
+    70%{box-shadow:0 0 0 8px rgba(79,122,72,0);}
+    100%{box-shadow:0 0 0 0 rgba(79,122,72,0);}
+  }
+  .status-line{font-size:0.75rem;color:var(--krem-redup);}
+  
+  .header-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  width:100%;
+}
+.btn-logout{
+  font-family:'JetBrains Mono', monospace;
+  font-weight:700;
+  font-size:0.72rem;
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+  color:var(--merah);
+  background:transparent;
+  border:1.5px solid var(--merah);
+  border-radius:20px;
+  padding:7px 16px;
+  cursor:pointer;
+  transition:all .15s ease;
+  white-space:nowrap;
+}
+.btn-logout:hover{
+  background:var(--merah);
+  color:var(--krem);
+}
+
+  .tabs{display:flex;
+  gap:8px;
+  width:100%;}
+  
+  .tab-btn{
+    flex: 1;
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:0.8rem;
+    padding:9px 18px;
+    border-radius:20px;
+    border:1.5px solid var(--tiket-border);
+    background:transparent;
+    color:var(--krem-redup);
+    cursor:pointer;
+    transition:all .15s ease;
+    white-space:nowrap;
+  }
+  .tab-btn.aktif{
+    background:var(--emas);
+    border-color:var(--emas);
+    color:#1C130B;
+  }
+  .tab-btn .count{
+    display:inline-block;
+    margin-left:6px;
+    opacity:0.8;
+  }
+
+  main{
+    max-width:1200px;
+    margin:0 auto;
+    padding:26px 24px;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(260px,1fr));
+    gap:20px;
+  }
+
+  .tiket{
+    background:var(--tiket);
+    border:1.5px solid var(--tiket-border);
+    border-radius:4px;
+    padding:18px 18px 16px;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .tiket.selesai{ opacity:0.55; }
+  .tiket-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    border-bottom:1px dashed var(--tiket-border);
+    padding-bottom:10px;
+  }
+  .tiket-id{font-size:0.75rem;color:var(--krem-redup);}
+  .badge{
+    font-size:0.7rem;
+    font-weight:700;
+    padding:3px 10px;
+    border-radius:12px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+  }
+    .badge.menunggu{background:var(--merah-redup); color:#E8846E;}
+    .badge.selesai{background:var(--hijau-redup); color:#8FCF84;}
+    .tiket.diproses{ opacity:0.85; border-color:var(--emas); }
+    .badge.diproses{background:rgba(200,153,46,0.18); color:var(--emas);}
+    .btn-toggle.mulai-masak{ background:var(--emas); color:#1C130B; }
+    .btn-toggle.mulai-masak:hover{ background:#b3861f; }
+   .item-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.85rem;
+    gap:8px;
+  }
+  .item-row .nama{color:var(--krem);}
+  .item-row .subtotal{color:var(--krem-redup); white-space:nowrap;}
+
+  .tiket-total{
+    display:flex;
+    justify-content:space-between;
+    border-top:1px dashed var(--tiket-border);
+    padding-top:10px;
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:1rem;
+    color:var(--emas);
+  }
+  .tiket-waktu{font-size:0.7rem;color:var(--krem-redup);}
+
+  .btn-toggle{
+    margin-top:4px;
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:0.85rem;
+    padding:11px;
+    border-radius:6px;
+    border:none;
+    cursor:pointer;
+    transition:transform .1s ease, background .15s ease;
+  }
+  .btn-toggle:active{ transform:scale(0.97); }
+  .btn-toggle.tandai-selesai{ background:var(--hijau); color:white; }
+  .btn-toggle.tandai-selesai:hover{ background:#436b3d; }
+  .btn-toggle.kembalikan{ background:transparent; color:var(--krem-redup); border:1.5px solid var(--tiket-border); }
+  .btn-toggle.kembalikan:hover{ border-color:var(--emas); color:var(--emas); }
+
+  .kosong{
+    grid-column:1/-1;
+    text-align:center;
+    padding:60px 20px;
+    color:var(--krem-redup);
+    font-size:0.9rem;
+  }
+  
+    @media (max-width: 480px){
+    header{ padding:18px 16px; }
+    .tabs{ gap:6px; }
+    .tab-btn{ font-size:0.7rem; padding:8px 6px; }
+    }
+  
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🍚 KDS — Warung Nasi Mak Fatih</h1>
+    <p class="status-line"><span class="live-dot"></span><span id="statusTeks">Menyambungkan...</span></p>
+  </div><button id="btnLogout" class=btn-logout>Keluar</button>
+  <div class="tabs">
+    <button class="tab-btn aktif" data-filter="semua" onclick="gantiFilter('semua')">Semua <span class="count" id="count-semua">0</span></button>
+    <button class="tab-btn" data-filter="menunggu" onclick="gantiFilter('menunggu')">Menunggu <span class="count" id="count-menunggu">0</span></button>
+    <button class="tab-btn" data-filter="diproses" onclick="gantiFilter('diproses')">Diproses <span class="count" id="count-diproses">0</span></button>
+    <button class="tab-btn" data-filter="selesai" onclick="gantiFilter('selesai')">Selesai <span class="count" id="count-selesai">0</span></button>
+  </div>
+</header>
+
+<main>
+  <div class="grid" id="grid"></div>
+</main>
+
+<script>
+  // --- INISIALISASI SUPABASE ---
+  const SUPABASE_URL = 'https://hziarikfceeirvcsoplj.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_qDKJzMXurd-bfr1LhsYHMg_sGbDMI22';
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let semuaPesanan = [];
+  let filterAktif = 'semua';
+
+  function formatWaktu(iso){
+    if(!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+  }
+
+  function formatRupiah(angka){
+    return 'Rp' + Number(angka || 0).toLocaleString('id-ID');
+  }
+
+  async function ambilPesanan(){
+    document.getElementById('statusTeks').textContent = 'Memuat pesanan...';
+    const { data, error } = await supabaseClient
+      .from('Pesanan')
+      .select('*')
+      .order('created_at', { ascending:false });
+
+    if(error){
+      console.error('Gagal ambil data:', JSON.stringify(error, null, 2));
+      document.getElementById('statusTeks').textContent = 'Gagal memuat data.';
+      document.getElementById('grid').innerHTML = `
+        <div class="kosong" style="text-align:left; color:#E8846E; white-space:pre-wrap;">
+Gagal memuat data dari Supabase.
+
+Kode: ${error.code || '-'}
+Pesan: ${error.message || '-'}
+Hint: ${error.hint || '-'}
+Detail: ${error.details || '-'}
+        </div>`;
+      return;
+    }
+    semuaPesanan = data || [];
+    document.getElementById('statusTeks').textContent = 'Tersambung — update otomatis';
+    render();
+  }
+
+  function gantiFilter(filter){
+    filterAktif = filter;
+    document.querySelectorAll('.tab-btn').forEach(btn=>{
+      btn.classList.toggle('aktif', btn.getAttribute('data-filter') === filter);
+    });
+    render();
+  }
+
+  function render(){
+  
+  const grid = document.getElementById('grid');
+  const menunggu = semuaPesanan.filter(p => p.status === 'menunggu');
+  const diproses = semuaPesanan.filter(p => p.status === 'diproses');
+  const selesai = semuaPesanan.filter(p => p.status === 'selesai');
+
+  document.getElementById('count-semua').textContent = semuaPesanan.length;
+  document.getElementById('count-menunggu').textContent = menunggu.length;
+  document.getElementById('count-diproses').textContent = diproses.length;
+  document.getElementById('count-selesai').textContent = selesai.length;
+
+  let daftar = semuaPesanan;
+  if(filterAktif === 'menunggu') daftar = menunggu;
+  if(filterAktif === 'diproses') daftar = diproses;
+  if(filterAktif === 'selesai') daftar = selesai;
+
+    if(daftar.length === 0){
+      grid.innerHTML = '<div class="kosong">Belum ada pesanan di kategori ini.</div>';
+      return;
+    }
+
+    grid.innerHTML = daftar.map(p => {
+ 
+      let rincian = p.rincian_pesanan;
+      if(typeof rincian === 'string'){
+        try{ rincian = JSON.parse(rincian); } catch(e){ rincian = []; }
+      }
+      if(!Array.isArray(rincian)) rincian = [];
+
+      const itemHtml = rincian.map(item => `
+        <div class="item-row">
+          <span class="nama">${item.menu} x${item.qty}</span>
+          <span class="subtotal">${formatRupiah(item.harga * item.qty)}</span>
+        </div>
+      `).join('');
+
+let tombolHtml = '';
+      if(p.status === 'menunggu'){
+        tombolHtml = `<button class="btn-toggle mulai-masak" onclick="ubahStatus(${p.id}, 'diproses')">Mulai Masak</button>`;
+      } else if(p.status === 'diproses'){
+        tombolHtml = `<button class="btn-toggle tandai-selesai" onclick="ubahStatus(${p.id}, 'selesai')">Tandai Selesai</button>`;
+      } else {
+        tombolHtml = `<button class="btn-toggle kembalikan" onclick="ubahStatus(${p.id}, 'diproses')">Kembalikan ke Diproses</button>`;
+      }
+
+      return `
+        <div class="tiket ${p.status}">
+          <div class="tiket-top">
+            <span class="tiket-id">#${p.id}</span>
+            <span class="badge ${p.status}">${p.status}</span>
+          </div>
+          <div class="daftar-item">${itemHtml}</div>
+          <div class="tiket-total">
+            <span>Total</span>
+            <span>${formatRupiah(p.total_harga)}</span>
+          </div>
+          <div class="tiket-waktu">${formatWaktu(p.created_at)}</div>
+          ${tombolHtml}
+        </div>
+      `;
+    }).join('');
+}
+  async function ubahStatus(id, statusBaru){
+    const { error } = await supabaseClient
+      .from('Pesanan')
+      .update({ status: statusBaru })
+      .eq('id', id);
+
+    if(error){
+      console.error('Gagal update status:', JSON.stringify(error, null, 2));
+      alert('Gagal update status.\nPesan: ' + (error.message || '-') + '\nKode: ' + (error.code || '-'));
+      return;
+    }
+    // Update langsung di tampilan tanpa nunggu refresh
+    const idx = semuaPesanan.findIndex(p => p.id === id);
+    if(idx > -1) semuaPesanan[idx].status = statusBaru;
+    render();
+  }
+
+  // --- REALTIME: dashboard otomatis update kalau ada pesanan baru dari menu ---
+  supabaseClient
+    .channel('pesanan-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'Pesanan' }, () => {
+      ambilPesanan();
+    })
+    .subscribe();
+
+  ambilPesanan();
+  
+  //---Tombol Logout---//
+  document.getElementById('btnLogout').addEventListener('click', async () => {
+  await supabaseClient.auth.signOut();
+  window.location.href = 'login.html'; // sesuaikan kalau nanti sudah di-hosting
+});
+</script>
+</body>
+</html>
