@@ -188,6 +188,50 @@
   }
   .btn-bayar:hover{ background:#b3861f; }
 
+  /* ===== TAB MEJA ===== */
+  .grid-meja{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(140px,1fr));
+    gap:14px;
+  }
+  .kartu-meja{
+    background:var(--tiket);
+    border:1.5px solid var(--tiket-border);
+    border-radius:4px;
+    padding:16px;
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+  }
+  .kartu-meja span{
+    font-weight:700;
+    color:var(--krem);
+    font-size:0.95rem;
+  }
+  .toggle-meja{
+    width:100%;
+    background:var(--merah-redup);
+    color:#E8846E;
+    border:1px solid var(--tiket-border);
+    border-radius:3px;
+    padding:10px;
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:0.72rem;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    cursor:pointer;
+    transition:background 0.15s, color 0.15s;
+  }
+  .toggle-meja:hover{ opacity:0.85; }
+  .toggle-meja.nyala{
+    background:var(--hijau-redup);
+    color:#8FBF85;
+    border-color:var(--hijau);
+  }
+
   /* ===== MODAL PEMBAYARAN ===== */
   .overlay-bayar{
     position:fixed; inset:0;
@@ -490,6 +534,37 @@ Hint: ${error.hint || '-'}
   if (filter === 'meja') renderMeja(); else render();
 }
 
+  const daftarNomorMeja = ['1','2','3','4','5','6','7','8','9','10']; // sesuaikan jumlah meja warung
+
+  async function ambilStatusMeja(){
+    const { data } = await supabaseClient.from('meja_status').select('*');
+    return data || [];
+  }
+
+  async function renderMeja(){
+    const statusList = await ambilStatusMeja();
+    const gridMeja = document.getElementById('gridMeja');
+
+    gridMeja.innerHTML = daftarNomorMeja.map(nomor => {
+      const status = statusList.find(s => s.nomor_meja === nomor);
+      const aktif = status ? status.aktif : false;
+      return `
+        <div class="kartu-meja">
+          <span>Meja ${nomor}</span>
+          <button class="toggle-meja ${aktif ? 'nyala' : ''}" onclick="toggleMeja('${nomor}', ${!aktif})">
+            ${aktif ? 'Aktif' : 'Nonaktif'}
+          </button>
+        </div>`;
+    }).join('');
+  }
+
+  async function toggleMeja(nomor, statusBaru){
+    await supabaseClient
+      .from('meja_status')
+      .upsert({ nomor_meja: nomor, aktif: statusBaru, updated_at: new Date().toISOString() });
+    renderMeja();
+  }
+
   function render(){
     const grid = document.getElementById('grid');
     const menunggu = semuaPesanan.filter(p => p.status === 'menunggu');
@@ -498,37 +573,6 @@ Hint: ${error.hint || '-'}
 
     document.getElementById('count-menunggu').textContent = menunggu.length;
     document.getElementById('count-riwayat').textContent = riwayat.length;
-    
-    const daftarNomorMeja = ['1','2','3','4','5','6','7','8','9','10']; // sesuaikan jumlah meja warung
-
-async function ambilStatusMeja(){
-  const { data } = await supabaseClient.from('meja_status').select('*');
-  return data || [];
-}
-
-async function renderMeja(){
-  const statusList = await ambilStatusMeja();
-  const gridMeja = document.getElementById('gridMeja');
-
-  gridMeja.innerHTML = daftarNomorMeja.map(nomor => {
-    const status = statusList.find(s => s.nomor_meja === nomor);
-    const aktif = status ? status.aktif : false;
-    return `
-      <div class="kartu-meja">
-        <span>Meja ${nomor}</span>
-        <button class="toggle-meja ${aktif ? 'nyala' : ''}" onclick="toggleMeja('${nomor}', ${!aktif})">
-          ${aktif ? 'Aktif' : 'Nonaktif'}
-        </button>
-      </div>`;
-  }).join('');
-}
-
-async function toggleMeja(nomor, statusBaru){
-  await supabaseClient
-    .from('meja_status')
-    .upsert({ nomor_meja: nomor, aktif: statusBaru, updated_at: new Date().toISOString() });
-  renderMeja();
-}
 
     const daftar = filterAktif === 'menunggu' ? menunggu : riwayat;
 
