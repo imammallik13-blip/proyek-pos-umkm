@@ -328,7 +328,11 @@ Detail: ${error.details || '-'}
 
 let tombolHtml = '';
       if(p.status === 'menunggu'){
-        tombolHtml = `<button class="btn-toggle mulai-masak" onclick="ubahStatus(${p.id}, 'diproses')">Mulai Masak</button>`;
+        if(p.dibayar){
+          tombolHtml = `<button class="btn-toggle mulai-masak" onclick="ubahStatus(${p.id}, 'diproses')">Mulai Masak</button>`;
+        } else {
+          tombolHtml = `<button class="btn-toggle" disabled style="opacity:0.5; cursor:not-allowed; background:transparent; border:1.5px dashed var(--tiket-border); color:var(--krem-redup);">⏳ Menunggu Konfirmasi Kasir</button>`;
+        }
       } else if(p.status === 'diproses'){
         tombolHtml = `<button class="btn-toggle tandai-selesai" onclick="ubahStatus(${p.id}, 'selesai')">Tandai Selesai</button>`;
       } else {
@@ -353,6 +357,16 @@ let tombolHtml = '';
     }).join('');
 }
   async function ubahStatus(id, statusBaru){
+    // Jaring pengaman: gak boleh mulai masak kalau belum dikonfirmasi kasir,
+    // walau fungsi ini dipanggil langsung (misal lewat console) bukan lewat tombol
+    if (statusBaru === 'diproses'){
+      const pesanan = semuaPesanan.find(p => p.id === id);
+      if (pesanan && pesanan.status === 'menunggu' && !pesanan.dibayar){
+        alert('Pesanan ini belum dikonfirmasi kasir. Gak bisa mulai masak dulu.');
+        return;
+      }
+    }
+
     const { error } = await supabaseClient
       .from('Pesanan')
       .update({ status: statusBaru })

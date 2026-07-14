@@ -485,7 +485,7 @@
       return 'Meja ' + p.nomor_meja;
     }
     if (p.jenis_pesanan === 'takeaway'){
-      return 'Bawa Pulang';
+      return p.nama_pelanggan ? `Bawa Pulang — a/n ${p.nama_pelanggan}` : 'Bawa Pulang';
     }
     return 'Lokasi tidak diketahui';
   }
@@ -501,9 +501,15 @@
   // --- AMBIL DATA DARI SUPABASE ---
   async function ambilPesanan(){
     document.getElementById('statusTeks').textContent = 'Memuat pesanan...';
+
+    // Cuma ambil pesanan hari ini — biar riwayat gak numpuk dari hari sebelumnya
+    const sekarang = new Date();
+    const awalHariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate()).toISOString();
+
     const { data, error } = await supabaseClient
       .from('Pesanan')
       .select('*')
+      .gte('created_at', awalHariIni)
       .order('created_at', { ascending:true });
 
     if(error){
@@ -567,8 +573,8 @@ Hint: ${error.hint || '-'}
 
   function render(){
     const grid = document.getElementById('grid');
-    const menunggu = semuaPesanan.filter(p => p.status === 'menunggu');
-    const riwayat = semuaPesanan.filter(p => p.status === 'diproses' || p.status === 'selesai')
+    const menunggu = semuaPesanan.filter(p => !p.dibayar);
+    const riwayat = semuaPesanan.filter(p => p.dibayar)
                                  .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
 
     document.getElementById('count-menunggu').textContent = menunggu.length;
@@ -590,7 +596,7 @@ Hint: ${error.hint || '-'}
         </div>
       `).join('');
 
-      const tombolBayar = p.status === 'menunggu'
+      const tombolBayar = !p.dibayar
         ? `<button class="btn-bayar" onclick="bukaPanelBayar(${p.id})">Konfirmasi Bayar</button>`
         : '';
 
@@ -736,7 +742,7 @@ Hint: ${error.hint || '-'}
 
     const { error } = await supabaseClient
       .from('Pesanan')
-      .update({ status: 'diproses' })
+      .update({ dibayar: true })
       .eq('id', pesananDipilih.id);
 
     if (error){
@@ -748,7 +754,7 @@ Hint: ${error.hint || '-'}
     }
 
     const idx = semuaPesanan.findIndex(x => x.id === pesananDipilih.id);
-    if (idx > -1) semuaPesanan[idx].status = 'diproses';
+    if (idx > -1) semuaPesanan[idx].dibayar = true;
 
     cetakStruk(pesananDipilih, uangDiterima, kembalian);
 
