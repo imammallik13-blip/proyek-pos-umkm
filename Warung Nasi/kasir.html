@@ -376,11 +376,13 @@
   <div class="tabs">
     <button class="tab-btn aktif" data-filter="menunggu" onclick="gantiFilter('menunggu')">Antrian Bayar <span class="count" id="count-menunggu">0</span></button>
     <button class="tab-btn" data-filter="riwayat" onclick="gantiFilter('riwayat')">Riwayat <span class="count" id="count-riwayat">0</span></button>
+    <button class="tab-btn" data-filter="meja" onclick="gantiFilter('meja')">Meja</button>
   </div>
 </header>
 
 <main>
   <div class="grid" id="grid"></div>
+  <div class="grid-meja" id="gridMeja" style="display:none;"></div>
 </main>
 
 <!-- ===== MODAL KONFIRMASI PEMBAYARAN ===== -->
@@ -483,8 +485,10 @@ Hint: ${error.hint || '-'}
     document.querySelectorAll('.tab-btn').forEach(btn=>{
       btn.classList.toggle('aktif', btn.getAttribute('data-filter') === filter);
     });
-    render();
-  }
+    document.getElementById('grid').style.display = filter === 'meja' ? 'none' : 'grid';
+  document.getElementById('gridMeja').style.display = filter === 'meja' ? 'grid' : 'none';
+  if (filter === 'meja') renderMeja(); else render();
+}
 
   function render(){
     const grid = document.getElementById('grid');
@@ -494,6 +498,37 @@ Hint: ${error.hint || '-'}
 
     document.getElementById('count-menunggu').textContent = menunggu.length;
     document.getElementById('count-riwayat').textContent = riwayat.length;
+    
+    const daftarNomorMeja = ['1','2','3','4','5','6','7','8','9','10']; // sesuaikan jumlah meja warung
+
+async function ambilStatusMeja(){
+  const { data } = await supabaseClient.from('meja_status').select('*');
+  return data || [];
+}
+
+async function renderMeja(){
+  const statusList = await ambilStatusMeja();
+  const gridMeja = document.getElementById('gridMeja');
+
+  gridMeja.innerHTML = daftarNomorMeja.map(nomor => {
+    const status = statusList.find(s => s.nomor_meja === nomor);
+    const aktif = status ? status.aktif : false;
+    return `
+      <div class="kartu-meja">
+        <span>Meja ${nomor}</span>
+        <button class="toggle-meja ${aktif ? 'nyala' : ''}" onclick="toggleMeja('${nomor}', ${!aktif})">
+          ${aktif ? 'Aktif' : 'Nonaktif'}
+        </button>
+      </div>`;
+  }).join('');
+}
+
+async function toggleMeja(nomor, statusBaru){
+  await supabaseClient
+    .from('meja_status')
+    .upsert({ nomor_meja: nomor, aktif: statusBaru, updated_at: new Date().toISOString() });
+  renderMeja();
+}
 
     const daftar = filterAktif === 'menunggu' ? menunggu : riwayat;
 
