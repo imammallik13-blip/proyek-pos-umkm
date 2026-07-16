@@ -381,6 +381,22 @@
     cursor:pointer;
   }
 
+  .btn-batal-pesanan{
+    width:100%;
+    margin-top:8px;
+    background:#8B1E1E;
+    color:white;
+    border:none;
+    border-radius:3px;
+    padding:10px;
+    cursor:pointer;
+    font-weight:bold;
+}
+
+.btn-batal-pesanan:hover{
+    background:#B22222;
+}
+
   /* ===== STRUK CETAK (tersembunyi, cuma muncul saat print) ===== */
   #strukPrint{ display:none; }
 
@@ -400,6 +416,96 @@
     #strukPrint .garis{ border-top:1px dashed #000; margin:6px 0; }
     #strukPrint .pusat{ text-align:center; }
     #strukPrint .baris{ display:flex; justify-content:space-between; }
+  }
+
+  /* ===== MODAL BATAL PESANAN ===== */
+
+  .overlay-batal{
+    position:fixed;
+    inset:0;
+    background:rgba(28,19,11,.85);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:80;
+  }
+
+  .overlay-batal.tampil{
+    display:flex;
+  }
+
+  .panel-batal{
+    width:92%;
+    max-width:430px;
+    background:var(--tiket);
+    border:2px solid var(--merah);
+    border-radius:10px;
+    padding:24px;
+  }
+
+  .panel-batal h2{
+    font-family:'Fraunces',serif;
+    margin-bottom:8px;
+    color:#F3E7D2;
+  }
+
+  .panel-batal p{
+    color:var(--krem-redup);
+    font-size:.78rem;
+    margin-bottom:18px;
+  }
+
+  .radio-batal{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 0;
+    border-bottom:1px dashed var(--tiket-border);
+  }
+
+  .radio-batal:last-child{
+    border-bottom:none;
+  }
+
+  .radio-batal input{
+  accent-color:#B5432E;
+  }
+
+  .input-lainnya{
+    width:100%;
+    margin-top:12px;
+    background:var(--bg);
+    color:var(--krem);
+    border:1px solid var(--tiket-border);
+    padding:10px;
+    border-radius:4px;
+    display:none;
+  }
+
+  .panel-btn{
+    display:flex;
+    gap:10px;
+    margin-top:22px;
+  }
+
+  .panel-btn button{
+    flex:1;
+    padding:12px;
+    border:none;
+    border-radius:4px;
+    cursor:pointer;
+    font-weight:bold;
+  }
+
+  .btn-konfirmasi-batal{
+    background:#B5432E;
+    color:white;
+  }
+
+  .btn-tutup-batal{
+    background:transparent;
+    color:var(--krem);
+    border:1px solid var(--tiket-border);
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -457,6 +563,54 @@
   </div>
 </div>
 
+<!--===== MODAL KONFIRMASI BATAL =====-->
+<div class="overlay-batal" id="overlayBatal">
+    <div class="panel-batal">
+        <h2>Batalkan Pesanan</h2>
+        <p id="judulPesananBatal"></p>
+
+        <label class="radio-batal">
+            <input type="radio" name="alasan" value="Salah Input">
+            Salah Input
+        </label>
+
+        <label class="radio-batal">
+            <input type="radio" name="alasan" value="Pelanggan Batal">
+            Pelanggan Batal
+        </label>
+
+        <label class="radio-batal">
+            <input type="radio" name="alasan" value="Double Order">
+            Double Order
+        </label>
+
+        <label class="radio-batal">
+            <input type="radio" name="alasan" value="Lainnya">
+            Lainnya
+        </label>
+
+        <input
+            id="inputLainnya"
+            class="input-lainnya"
+            placeholder="Tuliskan alasan..."
+        >
+
+        <div class="panel-btn">
+            <button
+                class="btn-tutup-batal"
+                onclick="tutupModalBatal()">
+                Kembali
+            </button>
+
+            <button
+                class="btn-konfirmasi-batal"
+                onclick="konfirmasiBatal()">
+                Ya, Batalkan
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Struk yang akan dicetak, diisi JS sesaat sebelum window.print() -->
 <div id="strukPrint"></div>
 
@@ -469,6 +623,7 @@
   let semuaPesanan = [];
   let filterAktif = 'menunggu';
   let pesananDipilih = null; // pesanan yang lagi dikonfirmasi di panel bayar
+  let idPesananBatal = null; // pesanan yang dibatalkan di panel bayar
 
   function formatWaktu(iso){
     if(!iso) return '';
@@ -573,8 +728,9 @@ Hint: ${error.hint || '-'}
 
   function render(){
     const grid = document.getElementById('grid');
-    const menunggu = semuaPesanan.filter(p => !p.dibayar);
-    const riwayat = semuaPesanan.filter(p => p.dibayar)
+    const menunggu = semuaPesanan.filter(p => !p.dibayar && p.status !== 'dibatalkan')
+                                 .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    const riwayat = semuaPesanan.filter(p => p.dibayar && p.status !== 'dibatalkan')
                                  .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
 
     document.getElementById('count-menunggu').textContent = menunggu.length;
@@ -597,8 +753,18 @@ Hint: ${error.hint || '-'}
       `).join('');
 
       const tombolBayar = !p.dibayar
-        ? `<button class="btn-bayar" onclick="bukaPanelBayar(${p.id})">Konfirmasi Bayar</button>`
-        : '';
+      ? `
+        <button class="btn-bayar"
+        onclick="bukaPanelBayar(${p.id})">
+        Konfirmasi Bayar
+        </button>
+
+        <button class="btn-batal-pesanan"
+        onclick="bukaModalBatal(${p.id})">
+        Batalkan Pesanan
+        </button>
+        `
+        : ''; 
 
       return `
         <div class="tiket">
@@ -658,6 +824,165 @@ Hint: ${error.hint || '-'}
     document.getElementById('overlayBayar').classList.remove('tampil');
     pesananDipilih = null;
   }
+
+  function bukaModalBatal(id){
+    idPesananBatal=id;
+    document.getElementById("judulPesananBatal").textContent=
+        "Order #"+id;
+    document
+        .querySelectorAll("input[name='alasan']")
+        .forEach(r=>r.checked=false);
+    document.getElementById("inputLainnya").style.display="none";
+    document.getElementById("inputLainnya").value="";
+    document
+        .getElementById("overlayBatal")
+        .classList.add("tampil");
+  }
+
+  function tutupModalBatal(){
+    document
+        .getElementById("overlayBatal")
+        .classList.remove("tampil");
+  }
+
+  async function batalkanPesanan(id){
+
+    const alasan = prompt(
+  `Batalkan Pesanan
+
+  Masukkan alasan:
+
+  1. Salah Input
+  2. Pelanggan Batal
+  3. Double Order
+  4. Lainnya`
+    );
+
+    if(alasan === null) return;
+
+    let teksAlasan = alasan;
+
+    switch(alasan){
+
+        case "1":
+            teksAlasan = "Salah Input";
+            break;
+
+        case "2":
+            teksAlasan = "Pelanggan Batal";
+            break;
+
+        case "3":
+            teksAlasan = "Double Order";
+            break;
+
+        case "4":
+            teksAlasan = "Lainnya";
+            break;
+    }
+
+    const yakin = confirm(
+  `Batalkan pesanan ini?
+
+  Alasan :
+  ${teksAlasan}`
+    );
+
+    if(!yakin) return;
+
+    const { error } = await supabaseClient
+        .from("Pesanan")
+        .update({
+
+            status:"dibatalkan",
+
+            alasan_batal:teksAlasan,
+
+            waktu_batal:new Date().toISOString(),
+
+            dibatalkan_oleh:"Kasir"
+
+        })
+        .eq("id",id);
+
+    if(error){
+
+        console.error(error);
+
+        alert("Gagal membatalkan");
+
+        return;
+
+    }
+
+    ambilPesanan();
+
+  }
+
+  async function konfirmasiBatal(){
+
+    let radio=document.querySelector(
+        "input[name='alasan']:checked"
+    );
+
+    if(!radio){
+
+        alert("Pilih alasan.");
+
+        return;
+
+    }
+
+    let alasan=radio.value;
+
+    if(alasan==="Lainnya"){
+
+        alasan=document
+            .getElementById("inputLainnya")
+            .value
+            .trim();
+
+        if(alasan===""){
+
+            alert("Isi alasan.");
+
+            return;
+
+        }
+
+    }
+
+    const {error}=await supabaseClient
+
+    .from("Pesanan")
+
+    .update({
+
+        status:"dibatalkan",
+
+        alasan_batal:alasan,
+
+        waktu_batal:new Date().toISOString(),
+
+        dibatalkan_oleh:"Kasir"
+
+    })
+
+    .eq("id",idPesananBatal);
+
+    if(error){
+
+        alert(error.message);
+
+        return;
+
+    }
+
+    tutupModalBatal();
+
+    ambilPesanan();
+
+}
 
   function pilihSaranUang(nominal){
     document.getElementById('inputUangDiterima').value = nominal.toLocaleString('id-ID');
@@ -763,6 +1088,22 @@ Hint: ${error.hint || '-'}
     tutupPanelBayar();
     render();
   });
+
+  
+// ===== Event Radio Alasan Batal =====
+document
+.querySelectorAll("input[name='alasan']")
+.forEach(r=>{
+    r.addEventListener("change",()=>{
+        const input = document.getElementById("inputLainnya");
+        if(r.value==="Lainnya" && r.checked){
+            input.style.display="block";
+        }else{
+            input.style.display="none";
+            input.value="";
+        }
+    });
+});
 
   // --- REALTIME: daftar antrian otomatis update kalau ada pesanan baru/berubah ---
   supabaseClient

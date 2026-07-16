@@ -329,7 +329,8 @@ Detail: ${error.details || '-'}
 let tombolHtml = '';
       if(p.status === 'menunggu'){
         if(p.dibayar){
-          tombolHtml = `<button class="btn-toggle mulai-masak" onclick="ubahStatus(${p.id}, 'diproses')">Mulai Masak</button>`;
+          tombolHtml = `<button class="btn-toggle mulai-masak" onclick="ubahStatus(${p.id}, 'diproses')">Mulai Masak</button>`
+          
         } else {
           tombolHtml = `<button class="btn-toggle" disabled style="opacity:0.5; cursor:not-allowed; background:transparent; border:1.5px dashed var(--tiket-border); color:var(--krem-redup);">⏳ Menunggu Konfirmasi Kasir</button>`;
         }
@@ -377,6 +378,20 @@ let tombolHtml = '';
       alert('Gagal update status.\nPesan: ' + (error.message || '-') + '\nKode: ' + (error.code || '-'));
       return;
     }
+
+    //Tiket pesanan hilang saat pesanan batalkan, karena statusnya berubah jadi "dibatalkan" dan gak ditampilkan di dashboard
+    if(p.status=="dibatalkan"){
+
+    tampilkanBanner();
+
+    setTimeout(()=>{
+
+        hilangkanTicket();
+
+    },10000);
+
+}
+
     // Update langsung di tampilan tanpa nunggu refresh
     const idx = semuaPesanan.findIndex(p => p.id === id);
     if(idx > -1) semuaPesanan[idx].status = statusBaru;
