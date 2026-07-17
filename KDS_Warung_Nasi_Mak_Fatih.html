@@ -379,20 +379,7 @@ let tombolHtml = '';
       return;
     }
 
-    //Tiket pesanan hilang saat pesanan batalkan, karena statusnya berubah jadi "dibatalkan" dan gak ditampilkan di dashboard
-    if(p.status=="dibatalkan"){
-
-    tampilkanBanner();
-
-    setTimeout(()=>{
-
-        hilangkanTicket();
-
-    },10000);
-
-}
-
-    // Update langsung di tampilan tanpa nunggu refresh
+    // Update langsung di tampilan tanpa nunggu event realtime/refresh
     const idx = semuaPesanan.findIndex(p => p.id === id);
     if(idx > -1) semuaPesanan[idx].status = statusBaru;
     render();
