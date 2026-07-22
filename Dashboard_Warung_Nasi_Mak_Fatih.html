@@ -92,6 +92,61 @@
   .panel.aktif{display:block;}
 
   /* ===== LAPORAN PENJUALAN ===== */
+  .filter-periode{
+    margin-bottom:18px;
+  }
+  .preset-btns{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .preset-btn{
+    font-family:'Montserrat', sans-serif;
+    font-weight:600;
+    font-size:0.78rem;
+    padding:8px 14px;
+    border:1.5px solid var(--coklat-sedang);
+    border-radius:20px;
+    background:var(--krem-terang);
+    color:var(--coklat-tua);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .preset-btn.aktif{
+    background:var(--coklat-tua);
+    border-color:var(--coklat-tua);
+    color:var(--krem-terang);
+  }
+  .custom-range{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:10px;
+  }
+  .custom-range input[type="date"]{
+    font-family:'Montserrat', sans-serif;
+    padding:7px 9px;
+    border:1.5px solid var(--coklat-sedang);
+    border-radius:5px;
+    background:var(--krem-terang);
+    color:var(--coklat-tua);
+    font-size:0.8rem;
+  }
+  .custom-range span{font-size:0.78rem; color:var(--coklat-sedang);}
+  .btn-terapkan{
+    font-family:'Montserrat', sans-serif;
+    font-weight:700;
+    font-size:0.78rem;
+    padding:7px 14px;
+    border:none;
+    border-radius:5px;
+    background:var(--emas);
+    color:var(--coklat-tua);
+    cursor:pointer;
+  }
+  .btn-terapkan:hover{background:#b3872a;}
+
   .ringkasan{
     display:grid;
     grid-template-columns:repeat(auto-fit, minmax(150px,1fr));
@@ -233,19 +288,30 @@
 
   <!-- ===== PANEL LAPORAN PENJUALAN ===== -->
   <div class="panel aktif" id="panel-laporan">
+    <div class="filter-periode">
+      <div class="preset-btns">
+        <button class="preset-btn aktif" data-preset="hari" onclick="gantiPeriode('hari')">Hari Ini</button>
+        <button class="preset-btn" data-preset="minggu" onclick="gantiPeriode('minggu')">Minggu Ini</button>
+        <button class="preset-btn" data-preset="bulan" onclick="gantiPeriode('bulan')">Bulan Ini</button>
+        <button class="preset-btn" data-preset="custom" onclick="gantiPeriode('custom')">Pilih Tanggal</button>
+      </div>
+      <div class="custom-range" id="customRange" style="display:none;">
+        <input type="date" id="tglMulai">
+        <span>s/d</span>
+        <input type="date" id="tglSelesai">
+        <button class="btn-terapkan" onclick="terapkanCustomRange()">Terapkan</button>
+      </div>
+    </div>
+
     <p class="status-teks" id="statusLaporan">Memuat data...</p>
 
     <div class="ringkasan">
       <div class="kartu-ringkasan">
-        <div class="label">Total Omzet</div>
+        <div class="label" id="labelOmzet">Omzet — Hari Ini</div>
         <div class="angka" id="totalOmzet">Rp0</div>
       </div>
       <div class="kartu-ringkasan">
-        <div class="label">Omzet Hari Ini</div>
-        <div class="angka" id="omzetHariIni">Rp0</div>
-      </div>
-      <div class="kartu-ringkasan">
-        <div class="label">Total Pesanan</div>
+        <div class="label" id="labelPesanan">Total Pesanan — Hari Ini</div>
         <div class="angka" id="totalPesanan">0</div>
       </div>
     </div>
@@ -303,13 +369,92 @@
   }
 
   // ===================== LAPORAN PENJUALAN =====================
+  let periodeAktif = 'hari'; // 'hari' | 'minggu' | 'bulan' | 'custom'
+
+  function gantiPeriode(preset){
+    periodeAktif = preset;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('aktif', b.getAttribute('data-preset') === preset));
+    const customRangeEl = document.getElementById('customRange');
+
+    if(preset === 'custom'){
+      customRangeEl.style.display = 'flex';
+      // Jangan langsung fetch — tunggu user isi tanggal & klik "Terapkan"
+      return;
+    }
+    customRangeEl.style.display = 'none';
+    muatLaporan();
+  }
+
+  function terapkanCustomRange(){
+    const mulai = document.getElementById('tglMulai').value;
+    const selesai = document.getElementById('tglSelesai').value;
+    if(!mulai || !selesai){
+      alert('Isi tanggal mulai dan selesai dulu ya.');
+      return;
+    }
+    if(mulai > selesai){
+      alert('Tanggal mulai gak boleh setelah tanggal selesai.');
+      return;
+    }
+    muatLaporan();
+  }
+
+  // Hitung rentang waktu (start-end) berdasarkan periode aktif.
+  // Dipakai buat query .gte()/.lte() ke Supabase, BUKAN filter di client —
+  // ini yang benerin masalah fetch-all (dulu ambil semua histori pesanan
+  // sekaligus tiap kali dashboard dibuka).
+  function hitungRentangTanggal(){
+    const sekarang = new Date();
+    let mulai, selesai;
+
+    if(periodeAktif === 'hari'){
+      mulai = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate(), 0, 0, 0);
+      selesai = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate(), 23, 59, 59, 999);
+    } else if(periodeAktif === 'minggu'){
+      const hari = sekarang.getDay(); // 0 = Minggu
+      const geserKeSenin = (hari === 0 ? -6 : 1) - hari;
+      mulai = new Date(sekarang);
+      mulai.setDate(sekarang.getDate() + geserKeSenin);
+      mulai.setHours(0, 0, 0, 0);
+      selesai = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate(), 23, 59, 59, 999);
+    } else if(periodeAktif === 'bulan'){
+      mulai = new Date(sekarang.getFullYear(), sekarang.getMonth(), 1, 0, 0, 0);
+      selesai = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate(), 23, 59, 59, 999);
+    } else { // custom
+      mulai = new Date(document.getElementById('tglMulai').value + 'T00:00:00');
+      selesai = new Date(document.getElementById('tglSelesai').value + 'T23:59:59.999');
+    }
+    return { mulai, selesai };
+  }
+
+  function labelPeriode(){
+    const opt = { day:'numeric', month:'short', year:'numeric' };
+    if(periodeAktif === 'hari') return 'Hari Ini';
+    if(periodeAktif === 'minggu') return 'Minggu Ini';
+    if(periodeAktif === 'bulan') return 'Bulan Ini';
+    const { mulai, selesai } = hitungRentangTanggal();
+    return `${mulai.toLocaleDateString('id-ID', opt)} s/d ${selesai.toLocaleDateString('id-ID', opt)}`;
+  }
+
   async function muatLaporan(){
     const statusEl = document.getElementById('statusLaporan');
     statusEl.textContent = 'Memuat data...';
 
+    const { mulai, selesai } = hitungRentangTanggal();
+
+    // Hanya hitung pesanan yang SUDAH DIBAYAR dan BUKAN status 'dibatalkan',
+    // DIBATASI ke rentang tanggal yang dipilih (query di level DB, bukan
+    // fetch-all lalu difilter di JS). .or() dengan status.is.null supaya
+    // pesanan lama (sebelum kolom status ada / masih NULL) tetap kehitung —
+    // kalau pakai .neq() polos, baris dengan status NULL ikut ke-exclude
+    // juga (NULL != 'x' = UNKNOWN di SQL).
     const { data, error } = await supabaseClient
       .from('Pesanan')
-      .select('*');
+      .select('*')
+      .eq('dibayar', true)
+      .or('status.is.null,status.neq.dibatalkan')
+      .gte('created_at', mulai.toISOString())
+      .lte('created_at', selesai.toISOString());
 
     if(error){
       console.error('Gagal ambil data pesanan:', JSON.stringify(error, null, 2));
@@ -318,20 +463,18 @@
     }
 
     const pesanan = data || [];
-    statusEl.textContent = `Terakhir dimuat: ${new Date().toLocaleTimeString('id-ID')}`;
+    const teksLabel = labelPeriode();
+    document.getElementById('labelOmzet').textContent = `Omzet — ${teksLabel}`;
+    document.getElementById('labelPesanan').textContent = `Total Pesanan — ${teksLabel}`;
+    statusEl.textContent = `Terakhir dimuat: ${new Date().toLocaleTimeString('id-ID')} • ${pesanan.length} pesanan valid (sudah dibayar, tidak dibatalkan)`;
 
-    // Total omzet & total pesanan
+    // Total omzet & menu terlaris — otomatis ikut kescope ke periode terpilih
+    // juga, karena dihitung dari `pesanan` yang query-nya udah dibatasi tanggal.
     let totalOmzet = 0;
-    let omzetHariIni = 0;
-    const hariIni = new Date().toDateString();
     const hitungMenu = {};
 
     pesanan.forEach(p => {
       totalOmzet += Number(p.total_harga || 0);
-
-      if(p.created_at && new Date(p.created_at).toDateString() === hariIni){
-        omzetHariIni += Number(p.total_harga || 0);
-      }
 
       let rincian = p.rincian_pesanan;
       if(typeof rincian === 'string'){
@@ -345,7 +488,6 @@
     });
 
     document.getElementById('totalOmzet').textContent = formatRupiah(totalOmzet);
-    document.getElementById('omzetHariIni').textContent = formatRupiah(omzetHariIni);
     document.getElementById('totalPesanan').textContent = pesanan.length;
 
     // Menu terlaris (top 5)

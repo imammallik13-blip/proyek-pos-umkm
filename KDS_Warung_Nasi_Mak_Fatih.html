@@ -257,9 +257,19 @@
 
   async function ambilPesanan(){
     document.getElementById('statusTeks').textContent = 'Memuat pesanan...';
+
+    // Dapur cuma perlu lihat pesanan HARI INI yang sudah dikonfirmasi kasir.
+    // Lewat tengah malam, otomatis nggak muncul lagi (nggak numpuk).
+    const sekarang = new Date();
+    const awalHariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate()).toISOString();
+    const awalBesok = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate() + 1).toISOString();
+
     const { data, error } = await supabaseClient
       .from('Pesanan')
       .select('*')
+      .eq('dibayar', true)
+      .gte('created_at', awalHariIni)
+      .lt('created_at', awalBesok)
       .order('created_at', { ascending:false });
 
     if(error){

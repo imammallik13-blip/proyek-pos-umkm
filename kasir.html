@@ -105,6 +105,25 @@
   .tab-btn.aktif{ background:var(--emas); border-color:var(--emas); color:#1C130B; }
   .tab-btn .count{ margin-left:6px; opacity:0.8; }
 
+  .filter-tanggal{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:10px;
+    font-size:0.75rem;
+    color:var(--krem-redup);
+  }
+  .filter-tanggal input[type="date"]{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.75rem;
+    color:var(--krem);
+    background:var(--tiket);
+    border:1px solid var(--tiket-border);
+    border-radius:4px;
+    padding:5px 8px;
+    color-scheme: dark;
+  }
+
   main{ max-width:1200px; margin:0 auto; padding:26px 20px; }
   .grid{
     display:grid;
@@ -528,6 +547,10 @@
     <button class="tab-btn" data-filter="riwayat" onclick="gantiFilter('riwayat')">Riwayat <span class="count" id="count-riwayat">0</span></button>
     <button class="tab-btn" data-filter="meja" onclick="gantiFilter('meja')">Meja</button>
   </div>
+  <div class="filter-tanggal">
+    <label for="inputTanggal">📅 Tanggal:</label>
+    <input type="date" id="inputTanggal">
+  </div>
 </header>
 
 <main>
@@ -657,14 +680,17 @@
   async function ambilPesanan(){
     document.getElementById('statusTeks').textContent = 'Memuat pesanan...';
 
-    // Cuma ambil pesanan hari ini — biar riwayat gak numpuk dari hari sebelumnya
-    const sekarang = new Date();
-    const awalHariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate()).toISOString();
+    // Ambil pesanan sesuai tanggal yang dipilih di date picker (default: hari ini)
+    const inputTanggal = document.getElementById('inputTanggal').value; // format: YYYY-MM-DD
+    const [tahun, bulan, tanggal] = inputTanggal.split('-').map(Number);
+    const awalHari = new Date(tahun, bulan - 1, tanggal).toISOString();
+    const akhirHari = new Date(tahun, bulan - 1, tanggal + 1).toISOString(); // batas atas: awal hari berikutnya
 
     const { data, error } = await supabaseClient
       .from('Pesanan')
       .select('*')
-      .gte('created_at', awalHariIni)
+      .gte('created_at', awalHari)
+      .lt('created_at', akhirHari)
       .order('created_at', { ascending:true });
 
     if(error){
@@ -672,11 +698,11 @@
       document.getElementById('statusTeks').textContent = 'Gagal memuat data.';
       document.getElementById('grid').innerHTML = `
         <div class="kosong" style="text-align:left; color:#E8846E; white-space:pre-wrap;">
-Gagal memuat data dari Supabase.
+    Gagal memuat data dari Supabase.
 
-Kode: ${error.code || '-'}
-Pesan: ${error.message || '-'}
-Hint: ${error.hint || '-'}
+    Kode: ${error.code || '-'}
+    Pesan: ${error.message || '-'}
+    Hint: ${error.hint || '-'}
         </div>`;
       return;
     }
@@ -1104,6 +1130,16 @@ document
         }
     });
 });
+
+  // --- FILTER TANGGAL: default hari ini, & re-fetch tiap kali diganti ---
+  (function inisialisasiFilterTanggal(){
+    const sekarang = new Date();
+    const yyyy = sekarang.getFullYear();
+    const mm = String(sekarang.getMonth() + 1).padStart(2, '0');
+    const dd = String(sekarang.getDate()).padStart(2, '0');
+    document.getElementById('inputTanggal').value = `${yyyy}-${mm}-${dd}`;
+  })();
+  document.getElementById('inputTanggal').addEventListener('change', ambilPesanan);
 
   // --- REALTIME: daftar antrian otomatis update kalau ada pesanan baru/berubah ---
   supabaseClient
